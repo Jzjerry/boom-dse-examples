@@ -1,8 +1,3 @@
-"""
-    An example file
-"""
-
-
 import random
 import torch
 import sklearn
