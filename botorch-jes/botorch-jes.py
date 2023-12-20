@@ -109,25 +109,6 @@ class BOTorchOptimizer(AbstractOptimizer):
         # pes = qMultiObjectivePredictiveEntropySearch(model=model, 
         #                                              pareto_sets=ps)
         return jes_lb
-    
-    def get_ac_ehvi(self, model):
-        ref_point = torch.tensor([0, 0, 0], dtype=torch.float64)
-
-        with torch.no_grad():
-            train_x = torch.tensor(self.x, dtype=torch.float64)
-            train_x = normalize(train_x, self.bounds)
-            pred = model.posterior(train_x).mean
-            partitioning = FastNondominatedPartitioning(
-                ref_point=ref_point,
-                Y=pred,
-            )
-        acq_func = qExpectedHypervolumeImprovement(
-            model=model,
-            ref_point=ref_point,
-            partitioning=partitioning
-        )
-        return acq_func
-
 
     def suggest(self):
         """
@@ -155,7 +136,7 @@ class BOTorchOptimizer(AbstractOptimizer):
             # return potential_suggest
             
             '''
-                Meta Latin Hypercube Initialization
+                Homebrew Latin Hypercube Initialization
             '''
             init_points = latin_hypercube(self.n_inits, self.dim)
             init_points = from_unit_cube(
@@ -186,23 +167,27 @@ class BOTorchOptimizer(AbstractOptimizer):
         else:
             print("[BoTorch]: Start to get Acq function ...")
             acq = self.get_ac(self.model)
-            # acq = self.get_ac_ehvi(self.model)
-            print("[BoTorch]: Start to evaluate Acq function ...")
-            X = normalize(torch.Tensor(self.microarchitecture_embedding_set), 
-                          self.bounds)
             
-            candidates, acq_values = optimize_acqf(
-                acq_function=acq,
-                bounds=self.std_bounds,
-                q=self.n_suggest,
-                num_restarts=5,
-                raw_samples=512,
-                sequential=True,
-            )
-
-            dist = torch.cdist(candidates, X)
-            min_distance_ids = dist.argmin(dim=1)
-            x_suggest = self.microarchitecture_embedding_set[min_distance_ids]
+            print("[BoTorch]: Start to evaluate Acq function ...")
+            sample_time = 10
+            sample_size = 512
+            total_acv_val = []
+            total_samples = []
+            # for now this only works when n_suggest = 1 
+            for _ in range(sample_time):
+                samples = random.sample(
+                    range(self.microarchitecture_embedding_set.shape[0]), 
+                    k=sample_size
+                )
+                X = self.microarchitecture_embedding_set[samples]
+                X = normalize(torch.Tensor(X), self.bounds)
+                with torch.no_grad():
+                    acq_values = acq.forward(X)
+                    top_acq_val, indices = torch.topk(acq_values, k=self.n_suggest)
+                total_acv_val.append(top_acq_val)
+                total_samples.append(samples[indices])
+            final_indice = torch.argmax(torch.tensor(total_acv_val).squeeze())
+            x_suggest = self.microarchitecture_embedding_set[total_samples[final_indice]]
             if self.n_suggest == 1:
                 return [x_suggest.tolist()]
             else:
