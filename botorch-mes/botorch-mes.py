@@ -36,6 +36,9 @@ from botorch.acquisition.multi_objective.utils import (
 )
 from botorch.optim import optimize_acqf
 from utils import *
+from BoomExplorerUtils.MicroAL import MicroAL
+
+random.seed(0)
 torch.manual_seed(0)
 np.random.seed(0)
 
@@ -138,32 +141,53 @@ class BOTorchOptimizer(AbstractOptimizer):
             '''
                 Homebrew Latin Hypercube Initialization
             '''
-            init_points = latin_hypercube(self.n_inits, self.dim)
-            init_points = from_unit_cube(
-                init_points, self.lb, self.ub)
-            x_suggest = []
-            for x in init_points:
-                    index = nearest(
-                        x, self.lb, self.ub, 
-                        self.microarchitecture_embedding_set)
-                    x_suggest.append(
-                        self.microarchitecture_embedding_set[index].tolist())
-            self.init = False
-            return x_suggest
-            '''
-                Botorch sobel draw
-            '''
+            # init_points = latin_hypercube(self.n_inits, self.dim)
+            # init_points = from_unit_cube(
+            #     init_points, self.lb, self.ub)
             # x_suggest = []
-            # self.init = False
-            # init_points = draw_sobol_samples(
-            #     self.bounds, self.n_inits, 1, seed=0).reshape([self.n_inits, self.dim]).numpy()
             # for x in init_points:
             #         index = nearest(
             #             x, self.lb, self.ub, 
             #             self.microarchitecture_embedding_set)
             #         x_suggest.append(
             #             self.microarchitecture_embedding_set[index].tolist())
+            # self.init = False
             # return x_suggest
+            '''
+                Botorch sobel draw
+            '''
+            x_suggest = []
+            self.init = False
+            init_points = draw_sobol_samples(
+                self.bounds, self.n_inits, 1, seed=0).reshape([self.n_inits, self.dim]).numpy()
+            for x in init_points:
+                    index = nearest(
+                        x, self.lb, self.ub, 
+                        self.microarchitecture_embedding_set)
+                    x_suggest.append(
+                        self.microarchitecture_embedding_set[index].tolist())
+            return x_suggest
+            '''
+                Micro AL from boom-explorer
+            '''
+            # self.init = False
+            # initial_configs = {
+            #     "Nrted": 59,
+            #     "mu": 0.1,
+            #     "sig": 0.1,
+            #     # the total samples in a cluster
+            #     "batch": self.n_inits,
+            #     "decoder-threshold": 35,
+            #     # number for clusters
+            #     "cluster": 5,
+            #     # the iterations of the clustering
+            #     "clustering-iteration": 1000,
+            #     "vis-micro-al": False
+            # }
+            # print("[MicroAL] Start Clustering...")
+            # initializer = MicroAL(configs=initial_configs, n_dim=self.dim)
+            # suggest_x = initializer.initialize(self.microarchitecture_embedding_set)
+            # return suggest_x
         else:
             print("[BoTorch]: Start to get Acq function ...")
             acq = self.get_ac(self.model)
