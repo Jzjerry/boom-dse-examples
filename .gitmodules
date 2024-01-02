@@ -1,0 +1,3 @@
+[submodule "boom-explorer-public"]
+	path = DKL-GP/boom-explorer-public
+	url = https://github.com/baichen318/boom-explorer-public
